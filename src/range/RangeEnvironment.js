@@ -106,7 +106,7 @@ export class RangeEnvironment {
     this.shootableMeshes = [];
     this.paperTargets = [];
     this.steelTargets = [];
-    this.movingEnabled = false;
+    this.movingEnabled = true;
     this.elapsed = 0;
 
     this._buildRoom();
@@ -336,22 +336,47 @@ export class RangeEnvironment {
       this.shootableMeshes.push(targetMesh);
     });
 
-    // 4 Reactive Steel Gongs / Plates at 15m and 30m
+    // 4 Static Reactive Steel Gongs + 2 Motorized Moving Steel Targets!
     const steelConfigs = [
-      { x: 1.55, y: 1.45, z: -15, radius: 0.24, color: 0xf97316, dist: 15 },
-      { x: 2.35, y: 1.45, z: -15, radius: 0.19, color: 0xef4444, dist: 15 },
-      { x: -1.95, y: 1.55, z: -30, radius: 0.30, color: 0xf97316, dist: 30 },
-      { x: -0.95, y: 1.55, z: -30, radius: 0.25, color: 0xeab308, dist: 30 },
+      { x: 1.55, y: 1.45, z: -15, radius: 0.24, color: 0xf97316, dist: 15, moving: false },
+      { x: 2.35, y: 1.45, z: -15, radius: 0.19, color: 0xef4444, dist: 15, moving: false },
+      { x: -1.95, y: 1.55, z: -30, radius: 0.30, color: 0xf97316, dist: 30, moving: false },
+      { x: -0.95, y: 1.55, z: -30, radius: 0.25, color: 0xeab308, dist: 30, moving: false },
+      // Moving Steel Targets (12m close-mid fast tracker + 36m long-range sniper tracker)
+      { x: 0.0, y: 1.38, z: -12, radius: 0.22, color: 0x38bdf8, dist: 12, moving: true, amp: 2.35, speed: 1.45, phase: 0.4 },
+      { x: 0.0, y: 1.65, z: -36, radius: 0.32, color: 0xf43f5e, dist: 36, moving: true, amp: 3.1, speed: 1.85, phase: 2.1 },
     ];
+
+    // Add visible motorized horizontal tracks for moving targets (12m, 22m, 36m)
+    const railMat = new THREE.MeshStandardMaterial({
+      color: 0x3b424e,
+      roughness: 0.42,
+      metalness: 0.8,
+    });
+    [
+      { y: 0.12, z: -12, width: 5.6 },
+      { y: 4.05, z: -22, width: 6.2 },
+      { y: 0.12, z: -36, width: 7.2 },
+    ].forEach((r) => {
+      const track = new THREE.Mesh(new THREE.BoxGeometry(r.width, 0.08, 0.10), railMat);
+      track.position.set(0, r.y, r.z);
+      this.group.add(track);
+    });
 
     steelConfigs.forEach((cfg) => {
       const stand = new THREE.Group();
       stand.position.set(cfg.x, 0, cfg.z);
 
-      // Steel post
+      // Steel post (with trolley base if moving)
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, cfg.y, 12), frameMat);
       post.position.set(0, cfg.y / 2, 0);
       stand.add(post);
+
+      if (cfg.moving) {
+        const trolley = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.14, 0.18), frameMat);
+        trolley.position.set(0, 0.14, 0);
+        stand.add(trolley);
+      }
 
       // Hinged pivot for plate recoil
       const pivot = new THREE.Group();
@@ -359,8 +384,10 @@ export class RangeEnvironment {
 
       const plateMat = new THREE.MeshStandardMaterial({
         color: cfg.color,
-        roughness: 0.38,
+        roughness: 0.35,
         metalness: 0.72,
+        emissive: cfg.moving ? cfg.color : 0x000000,
+        emissiveIntensity: cfg.moving ? 0.18 : 0,
       });
       const plate = new THREE.Mesh(new THREE.CylinderGeometry(cfg.radius, cfg.radius, 0.035, 24), plateMat);
       plate.rotation.x = Math.PI / 2;
@@ -368,8 +395,14 @@ export class RangeEnvironment {
       plate.castShadow = true;
 
       const steelObj = {
+        stand,
         pivot,
         plate,
+        baseX: cfg.x,
+        moving: !!cfg.moving,
+        amp: cfg.amp || 0,
+        speed: cfg.speed || 1,
+        phase: cfg.phase || 0,
         angle: 0,
         vel: 0,
         distance: cfg.dist,
@@ -413,13 +446,16 @@ export class RangeEnvironment {
     const w = targetObj.canvas.width;
     const h = targetObj.canvas.height;
     // Head zone
+    const movingBonus = targetObj.movable && this.movingEnabled;
     if (x >= w * 0.38 && x <= w * 0.62 && y >= h * 0.08 && y <= h * 0.24) {
-      return { score: 100, label: 'HEADSHOT +100' };
+      return movingBonus
+        ? { score: 150, label: 'MOVING HEADSHOT +150' }
+        : { score: 100, label: 'HEADSHOT +100' };
     }
     const dx = x - w * 0.5;
     const dy = y - h * 0.5;
     const dist = Math.hypot(dx, dy);
-    if (dist <= 36) return { score: 50, label: 'BULLSEYE +50' };
+    if (dist <= 36) return movingBonus ? { score: 80, label: 'MOVING BULLSEYE +80' } : { score: 50, label: 'BULLSEYE +50' };
     if (dist <= 70) return { score: 30, label: 'INNER +30' };
     if (dist <= 115) return { score: 20, label: 'TARGET +20' };
     if (dist <= 165) return { score: 10, label: 'HIT +10' };
@@ -428,6 +464,9 @@ export class RangeEnvironment {
 
   registerSteelHit(steelObj, power = 1.0) {
     steelObj.vel = -7.5 * power;
+    if (steelObj.moving && this.movingEnabled) {
+      return { score: 60, label: 'MOVING STEEL +60' };
+    }
     return { score: 40, label: 'STEEL PING +40' };
   }
 
@@ -462,8 +501,13 @@ export class RangeEnvironment {
       t.mesh.rotation.x = t.swayAngle;
     });
 
-    // Steel target spring-damper recoil
+    // Steel target horizontal movement & spring-damper recoil
     this.steelTargets.forEach((s) => {
+      if (s.moving && this.movingEnabled) {
+        s.stand.position.x = s.baseX + Math.sin(this.elapsed * s.speed + s.phase) * s.amp;
+      } else if (s.moving) {
+        s.stand.position.x += (s.baseX - s.stand.position.x) * Math.min(1, dt * 4);
+      }
       const spring = -s.angle * 38 - s.vel * 4.5;
       s.vel += spring * dt;
       s.angle += s.vel * dt;

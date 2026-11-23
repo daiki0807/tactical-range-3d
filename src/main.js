@@ -114,6 +114,7 @@ class TacticalRangeApp {
     this.aimTouchLastY = 0;
     this.pinchStartDist = 0;
     this.pinchStartZoom = 0.92;
+    this.lastTouchTime = 0;
 
     this.raycaster = new THREE.Raycaster();
     this.clock = new THREE.Clock();
@@ -302,6 +303,9 @@ class TacticalRangeApp {
     const startFireInput = (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (e.pointerType && e.pointerType !== 'mouse') {
+        this.lastTouchTime = performance.now();
+      }
       if (!this.started || this.inspectMode) return;
       this.sound.init();
       this.isMouseDown = true;
@@ -707,8 +711,18 @@ class TacticalRangeApp {
       }
     });
 
+    // Prevent synthetic mousemove after touch taps on any HUD button
+    window.addEventListener('touchstart', () => {
+      this.lastTouchTime = performance.now();
+    }, { passive: true });
+    window.addEventListener('touchend', () => {
+      this.lastTouchTime = performance.now();
+    }, { passive: true });
+
     window.addEventListener('mousemove', (e) => {
       if (!this.started) return;
+      // Ignore synthetic compatibility mousemove events fired after touch taps (prevents snapping to bottom-right FIRE button!)
+      if (this.isTouchDevice || performance.now() - this.lastTouchTime < 800) return;
 
       if (this.inspectMode) {
         if (this.inspectDragging) {
@@ -721,6 +735,9 @@ class TacticalRangeApp {
         }
         return;
       }
+
+      // Only aim with mouse when hovering the 3D canvas itself (ignore HUD buttons like FIRE / Reload / Weapon Dock)
+      if (e.target !== this.canvas) return;
 
       // Smooth range aiming mapped from cursor position on viewport
       const nx = (e.clientX / window.innerWidth) * 2 - 1;
