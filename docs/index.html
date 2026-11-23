@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TACTICAL RANGE 3D | 最新銃器 3D試し撃ちシミュレーター</title>
+  <script type="module" crossorigin src="/tactical-range-3d/assets/index-DNuU-ilX.js"></script>
+  <link rel="stylesheet" crossorigin href="/tactical-range-3d/assets/index-BivZXSyB.css">
+</head>
+<body>
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Sniper Scope Overlay (Shown only during Sniper ADS) -->
+  <div id="scope-overlay" class="scope-overlay hidden">
+    <div class="scope-vignette"></div>
+    <div class="scope-reticle">
+      <div class="scope-h-line"></div>
+      <div class="scope-v-line"></div>
+      <div class="scope-center-dot"></div>
+      <div class="scope-mil-marks"></div>
+    </div>
+    <div class="scope-info">8.0× OPTIC // .338 LAPUA MAGNUM</div>
+  </div>
+
+  <!-- Dynamic Crosshair -->
+  <div id="crosshair" class="crosshair">
+    <span class="ch-line ch-top"></span>
+    <span class="ch-line ch-bottom"></span>
+    <span class="ch-line ch-left"></span>
+    <span class="ch-line ch-right"></span>
+    <span class="ch-dot"></span>
+    <div id="hitmarker" class="hitmarker">
+      <span class="hm-1"></span>
+      <span class="hm-2"></span>
+      <span class="hm-3"></span>
+      <span class="hm-4"></span>
+    </div>
+  </div>
+
+  <!-- Floating Hit Feedback -->
+  <div id="hit-feed" class="hit-feed"></div>
+
+  <!-- Top Left: Weapon Spec & Score HUD -->
+  <header class="hud-top-left">
+    <div class="brand-badge">
+      <span class="status-dot"></span>
+      TACTICAL RANGE 3D
+    </div>
+    <div class="weapon-title-block">
+      <div id="hud-category" class="weapon-category">アサルトライフル / AR</div>
+      <h1 id="hud-weapon-name" class="weapon-name">HK416-A8 CARBINE</h1>
+      <div id="hud-weapon-meta" class="weapon-meta">5.56×45mm NATO • 750 RPM</div>
+      <p id="hud-weapon-desc" class="weapon-desc"></p>
+    </div>
+  </header>
+
+  <!-- Top Right: Telemetry & Range Controls -->
+  <aside class="hud-top-right">
+    <div class="score-panel">
+      <div class="stat-item">
+        <span class="stat-label">SCORE</span>
+        <span id="hud-score" class="stat-value accent">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">HITS / SHOTS</span>
+        <span id="hud-accuracy" class="stat-value">0 / 0</span>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button id="btn-inspect" class="tac-btn" title="360°鑑賞モード (I)">
+        <span class="key-hint">I</span> 360°鑑賞
+      </button>
+      <button id="btn-suppressor" class="tac-btn" title="サプレッサー着脱 (S)">
+        <span class="key-hint">S</span> サプレッサー: <strong id="lbl-suppressor">OFF</strong>
+      </button>
+      <button id="btn-firemode" class="tac-btn" title="発射モード切替 (B)">
+        <span class="key-hint">B</span> モード: <strong id="lbl-firemode">AUTO</strong>
+      </button>
+      <button id="btn-moving" class="tac-btn" title="移動ターゲット (M)">
+        <span class="key-hint">M</span> 移動的: <strong id="lbl-moving">OFF</strong>
+      </button>
+      <button id="btn-reset" class="tac-btn" title="ターゲット交換 (T)">
+        <span class="key-hint">T</span> 的リセット
+      </button>
+      <button id="btn-mute" class="tac-btn icon-only" title="音声ミュート">🔊</button>
+    </div>
+  </aside>
+
+  <!-- Inspect Mode Hint Banner -->
+  <div id="inspect-banner" class="inspect-banner hidden">
+    <span>360° 鑑賞モード</span> — ドラッグで回転 / ホイールでズーム / <strong>Iキー</strong> またはボタンで射撃に戻る
+  </div>
+
+  <!-- Bottom Right: Ammo & Reload -->
+  <div class="hud-bottom-right">
+    <div id="reload-bar-wrap" class="reload-bar-wrap hidden">
+      <div class="reload-label">RELOADING...</div>
+      <div class="reload-track"><div id="reload-fill" class="reload-fill"></div></div>
+    </div>
+    <div class="ammo-panel">
+      <div class="ammo-numbers">
+        <span id="hud-ammo" class="ammo-current">30</span>
+        <span class="ammo-sep">/</span>
+        <span id="hud-mag" class="ammo-max">30</span>
+      </div>
+      <div class="ammo-actions">
+        <button id="btn-reload" class="tac-btn small"><span class="key-hint">R</span> リロード</button>
+        <span class="ads-hint">右クリック：サイトを覗く</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Center: Weapon Selector Dock -->
+  <nav id="weapon-dock" class="weapon-dock" aria-label="銃器選択"></nav>
+
+  <!-- Start Overlay (Unlocks Web Audio cleanly) -->
+  <div id="start-overlay" class="start-overlay">
+    <div class="start-card">
+      <div class="start-kicker">3D REALISTIC BALLISTICS &amp; ACOUSTICS</div>
+      <h2 class="start-title">TACTICAL RANGE 3D</h2>
+      <p class="start-sub">最新の拳銃・サブマシンガン・アサルトライフル・軽機関銃・狙撃ライフルを、リアルな立体音響と3Dモデルで試し撃ちできます。</p>
+      <div class="start-controls-grid">
+        <div><strong>左クリック</strong><span>射撃（長押しで連射）</span></div>
+        <div><strong>右クリック</strong><span>サイトを覗く（ADS）</span></div>
+        <div><strong>R / B / S</strong><span>リロード / 連射切替 / サプレッサー</span></div>
+        <div><strong>I キー</strong><span>銃の360°鑑賞モード</span></div>
+      </div>
+      <button id="btn-start" class="start-btn">射撃場に入る（サウンド ON）</button>
+    </div>
+  </div>
+
+</body>
+</html>
