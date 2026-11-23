@@ -105,6 +105,15 @@ class TacticalRangeApp {
     this.inspectRotX = 0.14;
     this.inspectZoom = 0.92;
 
+    // Multi-touch State (for mobile & tablet)
+    this.isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+    this.showTouchUI = this.isTouchDevice || window.innerWidth <= 1024;
+    this.aimTouchId = null;
+    this.aimTouchLastX = 0;
+    this.aimTouchLastY = 0;
+    this.pinchStartDist = 0;
+    this.pinchStartZoom = 0.92;
+
     this.raycaster = new THREE.Raycaster();
     this.clock = new THREE.Clock();
 
@@ -164,6 +173,69 @@ class TacticalRangeApp {
       this.sound.init();
       this.started = true;
       document.getElementById('start-overlay').classList.add('hidden');
+    });
+
+    // Touch UI visibility toggle
+    const touchUiBtn = document.getElementById('btn-touch-ui');
+    const syncTouchUI = () => {
+      document.body.classList.toggle('show-touch-ui', this.showTouchUI);
+      touchUiBtn.classList.toggle('active', this.showTouchUI);
+    };
+    syncTouchUI();
+    touchUiBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.showTouchUI = !this.showTouchUI;
+      syncTouchUI();
+    });
+
+    // On-screen Touch FIRE / ADS / RELOAD buttons
+    const touchFire = document.getElementById('touch-fire');
+    const startFireInput = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!this.started || this.inspectMode) return;
+      this.sound.init();
+      this.isMouseDown = true;
+      touchFire.classList.add('firing');
+      if (!this.isReloading && this.fireCooldown <= 0 && this.boltTimer <= 0) {
+        const mode = this.fireModeState[this.currentSpec.id];
+        if (mode === 'BURST') {
+          this.burstRemaining = 3;
+        } else {
+          this._fireOneRound();
+        }
+      }
+    };
+    const endFireInput = (e) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      this.isMouseDown = false;
+      touchFire.classList.remove('firing');
+    };
+    touchFire.addEventListener('pointerdown', startFireInput);
+    touchFire.addEventListener('pointerup', endFireInput);
+    touchFire.addEventListener('pointercancel', endFireInput);
+    touchFire.addEventListener('pointerleave', endFireInput);
+
+    const touchAds = document.getElementById('touch-ads');
+    touchAds.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!this.started || this.inspectMode || this.isReloading) return;
+      this.sound.init();
+      this.isAds = !this.isAds;
+      touchAds.classList.toggle('active', this.isAds);
+    });
+
+    const touchReload = document.getElementById('touch-reload');
+    touchReload.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!this.started || this.inspectMode) return;
+      this.sound.init();
+      this.startReload();
     });
 
     document.getElementById('btn-inspect').addEventListener('click', (e) => {
@@ -335,6 +407,7 @@ class TacticalRangeApp {
     this.reloadElapsed = 0;
     this.burstRemaining = 0;
     this.isAds = false;
+    document.getElementById('touch-ads')?.classList.remove('active');
     document.getElementById('reload-bar-wrap').classList.remove('hidden');
     this.sound.playReload(this.currentSpec.reloadTime);
   }
@@ -356,8 +429,11 @@ class TacticalRangeApp {
     // Fire rate cooldown
     this.fireCooldown = 60 / spec.rpm;
 
-    // Audio
+    // Audio & subtle mobile haptic kick
     this.sound.playGunshot(spec.soundProfile, this.suppressed);
+    if (navigator.vibrate) {
+      navigator.vibrate(spec.id === 'sniper' ? 35 : spec.id === 'lmg' ? 22 : 14);
+    }
     if (!spec.boltAction) {
       this.sound.playShellCasing(spec.soundProfile.casingPitch);
     } else {
@@ -550,6 +626,81 @@ class TacticalRangeApp {
       if (!this.inspectMode) return;
       this.inspectZoom = Math.max(0.42, Math.min(1.85, this.inspectZoom + e.deltaY * 0.0012));
     });
+
+    // Multi-touch Canvas Controls (1-finger drag to aim/rotate, 2-finger pinch to zoom in inspect mode)
+    this.canvas.addEventListener('touchstart', (e) => {
+      if (!this.started) return;
+      e.preventDefault();
+      this.sound.init();
+
+      if (this.inspectMode && e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        this.pinchStartDist = Math.hypot(dx, dy);
+        this.pinchStartZoom = this.inspectZoom;
+        this.inspectDragging = false;
+        return;
+      }
+
+      if (this.aimTouchId === null && e.changedTouches.length > 0) {
+        const t = e.changedTouches[0];
+        this.aimTouchId = t.identifier;
+        this.aimTouchLastX = t.clientX;
+        this.aimTouchLastY = t.clientY;
+        if (this.inspectMode) {
+          this.inspectDragging = true;
+        }
+      }
+    }, { passive: false });
+
+    this.canvas.addEventListener('touchmove', (e) => {
+      if (!this.started) return;
+      e.preventDefault();
+
+      if (this.inspectMode && e.touches.length === 2 && this.pinchStartDist > 0) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const dist = Math.hypot(dx, dy);
+        const ratio = this.pinchStartDist / Math.max(10, dist);
+        this.inspectZoom = Math.max(0.42, Math.min(1.85, this.pinchStartZoom * ratio));
+        return;
+      }
+
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier === this.aimTouchId) {
+          const dx = t.clientX - this.aimTouchLastX;
+          const dy = t.clientY - this.aimTouchLastY;
+          this.aimTouchLastX = t.clientX;
+          this.aimTouchLastY = t.clientY;
+
+          if (this.inspectMode) {
+            this.inspectRotY += dx * 0.01;
+            this.inspectRotX = Math.max(-1.05, Math.min(1.05, this.inspectRotX + dy * 0.0085));
+          } else {
+            const sens = this.isAds && this.currentSpec.isScoped ? 0.0012 : this.isAds ? 0.0022 : 0.0034;
+            this.targetYaw = Math.max(-0.52, Math.min(0.52, this.targetYaw - dx * sens));
+            this.targetPitch = Math.max(-0.28, Math.min(0.28, this.targetPitch - dy * sens));
+          }
+          break;
+        }
+      }
+    }, { passive: false });
+
+    const endCanvasTouch = (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === this.aimTouchId) {
+          this.aimTouchId = null;
+          this.inspectDragging = false;
+          break;
+        }
+      }
+      if (e.touches.length < 2) {
+        this.pinchStartDist = 0;
+      }
+    };
+    this.canvas.addEventListener('touchend', endCanvasTouch, { passive: false });
+    this.canvas.addEventListener('touchcancel', endCanvasTouch, { passive: false });
 
     window.addEventListener('keydown', (e) => {
       if (!this.started) return;

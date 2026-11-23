@@ -21,6 +21,9 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-touch-callout: none;
   background: #0b0e14;
   color: var(--text-main);
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
@@ -30,6 +33,7 @@ html, body {
   display: block;
   width: 100vw;
   height: 100vh;
+  touch-action: none;
   cursor: crosshair;
 }
 
@@ -617,14 +621,199 @@ body.inspect-mode #webgl-canvas:active {
   filter: brightness(1.08);
 }
 
+/* ==================== On-Screen Touch Controls ==================== */
+.touch-controls {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 32;
+  display: none;
+}
+
+body.show-touch-ui .touch-controls {
+  display: block;
+}
+
+body.inspect-mode .touch-controls {
+  display: none !important;
+}
+
+.touch-left-pad {
+  position: fixed;
+  left: max(18px, env(safe-area-inset-left));
+  bottom: calc(108px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.touch-right-pad {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: calc(106px + env(safe-area-inset-bottom));
+  pointer-events: auto;
+}
+
+.touch-circle-btn {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: rgba(15, 20, 28, 0.72);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  color: var(--text-main);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  backdrop-filter: blur(8px);
+  touch-action: none;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.12s ease, border-color 0.12s ease;
+}
+.touch-circle-btn:active,
+.touch-circle-btn.active {
+  transform: scale(0.93);
+  background: rgba(245, 158, 11, 0.28);
+  border-color: var(--accent);
+  color: #fef3c7;
+  box-shadow: 0 0 18px var(--accent-glow);
+}
+.tc-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+.tc-label {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.touch-fire-btn {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(245, 158, 11, 0.48), rgba(220, 38, 38, 0.58));
+  border: 2.5px solid rgba(251, 191, 36, 0.85);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 26px rgba(245, 158, 11, 0.35), inset 0 0 18px rgba(255, 255, 255, 0.16);
+  touch-action: none;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.touch-fire-btn:active,
+.touch-fire-btn.firing {
+  transform: scale(0.91);
+  background: radial-gradient(circle at 50% 50%, rgba(251, 191, 36, 0.8), rgba(239, 68, 68, 0.85));
+  box-shadow: 0 0 36px rgba(239, 68, 68, 0.75);
+}
+.tf-ring {
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+}
+.tf-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+.tf-sub {
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
 @media (max-width: 1120px) {
   .weapon-dock {
-    bottom: 10px;
-    max-width: 96vw;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    max-width: calc(100vw - 20px);
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
-  .weapon-card { min-width: 106px; padding: 6px 8px; }
-  .hud-bottom-right { bottom: 104px; }
-  .inspect-banner { bottom: 196px; font-size: 11px; }
+  .weapon-card { min-width: 108px; padding: 6px 9px; flex-shrink: 0; }
+  .hud-bottom-right { bottom: calc(104px + env(safe-area-inset-bottom)); }
+  body.show-touch-ui .hud-bottom-right {
+    bottom: calc(214px + env(safe-area-inset-bottom));
+    right: max(14px, env(safe-area-inset-right));
+  }
+  .inspect-banner { bottom: calc(108px + env(safe-area-inset-bottom)); font-size: 11px; max-width: 92vw; text-align: center; white-space: normal; }
   .weapon-desc { display: none; }
+}
+
+@media (max-width: 768px) {
+  .hud-top-left {
+    top: max(10px, env(safe-area-inset-top));
+    left: max(10px, env(safe-area-inset-left));
+    max-width: 52vw;
+  }
+  .brand-badge {
+    font-size: 9px;
+    padding: 3px 8px;
+    margin-bottom: 6px;
+  }
+  .weapon-title-block {
+    padding: 7px 10px;
+  }
+  .weapon-category { font-size: 9px; }
+  .weapon-name { font-size: 14px; }
+  .weapon-meta { font-size: 10px; }
+
+  .hud-top-right {
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    gap: 6px;
+  }
+  .score-panel {
+    padding: 6px 10px;
+    gap: 12px;
+  }
+  .stat-label { font-size: 8.5px; }
+  .stat-value { font-size: 15px; }
+
+  .action-bar {
+    max-width: 46vw;
+    gap: 4px;
+  }
+  .tac-btn {
+    padding: 5px 7px;
+    font-size: 10.5px;
+    gap: 4px;
+  }
+  .key-hint { display: none; }
+
+  .ammo-panel {
+    padding: 6px 11px;
+  }
+  .ammo-current { font-size: 26px; }
+  .ammo-sep { font-size: 15px; }
+  .ammo-max { font-size: 14px; }
+  .ammo-actions { display: none; }
+
+  .start-card { padding: 22px 18px; }
+  .start-title { font-size: 23px; }
+  .start-controls-grid { grid-template-columns: 1fr; gap: 7px; }
+}
+
+/* Landscape phone optimization */
+@media (max-height: 500px) and (pointer: coarse) {
+  .hud-top-left .brand-badge,
+  .hud-top-left .weapon-meta { display: none; }
+  .weapon-dock { padding: 4px; gap: 5px; }
+  .weapon-card { padding: 4px 8px; min-width: 96px; }
+  .wc-cal { display: none; }
+  .touch-left-pad { bottom: 72px; flex-direction: row; }
+  .touch-right-pad { bottom: 70px; }
+  .touch-fire-btn { width: 82px; height: 82px; }
+  .touch-circle-btn { width: 56px; height: 56px; }
+  body.show-touch-ui .hud-bottom-right { bottom: 162px; }
 }

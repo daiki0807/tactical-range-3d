@@ -2,10 +2,12 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>TACTICAL RANGE 3D | 最新銃器 3D試し撃ちシミュレーター</title>
-  <script type="module" crossorigin src="/tactical-range-3d/assets/index-RQ6EcIUf.js"></script>
-  <link rel="stylesheet" crossorigin href="/tactical-range-3d/assets/index-BivZXSyB.css">
+  <script type="module" crossorigin src="/tactical-range-3d/assets/index-DBPugRWz.js"></script>
+  <link rel="stylesheet" crossorigin href="/tactical-range-3d/assets/index-_ClTPIiD.css">
 </head>
 <body>
   <canvas id="webgl-canvas"></canvas>
@@ -83,13 +85,37 @@
       <button id="btn-reset" class="tac-btn" title="ターゲット交換 (T)">
         <span class="key-hint">T</span> 的リセット
       </button>
+      <button id="btn-touch-ui" class="tac-btn" title="タッチ操作ボタン表示切替">
+        📱 操作UI
+      </button>
       <button id="btn-mute" class="tac-btn icon-only" title="音声ミュート">🔊</button>
     </div>
   </aside>
 
   <!-- Inspect Mode Hint Banner -->
   <div id="inspect-banner" class="inspect-banner hidden">
-    <span>360° 鑑賞モード</span> — ドラッグで回転 / ホイールでズーム / <strong>Iキー</strong> またはボタンで射撃に戻る
+    <span>360° 鑑賞モード</span> — ドラッグで回転 / ピンチ・ホイールでズーム / <strong>Iキー</strong> またはボタンで戻る
+  </div>
+
+  <!-- On-Screen Touch Controls (Mobile & Tablet) -->
+  <div id="touch-controls" class="touch-controls">
+    <div class="touch-left-pad">
+      <button id="touch-ads" class="touch-circle-btn ads-btn" type="button">
+        <span class="tc-icon">⊕</span>
+        <span class="tc-label">サイト</span>
+      </button>
+      <button id="touch-reload" class="touch-circle-btn reload-btn" type="button">
+        <span class="tc-icon">↻</span>
+        <span class="tc-label">リロード</span>
+      </button>
+    </div>
+    <div class="touch-right-pad">
+      <button id="touch-fire" class="touch-fire-btn" type="button">
+        <span class="tf-ring"></span>
+        <span class="tf-text">FIRE</span>
+        <span class="tf-sub">長押し連射</span>
+      </button>
+    </div>
   </div>
 
   <!-- Bottom Right: Ammo & Reload -->
@@ -121,10 +147,10 @@
       <h2 class="start-title">TACTICAL RANGE 3D</h2>
       <p class="start-sub">最新の拳銃・サブマシンガン・アサルトライフル・軽機関銃・狙撃ライフルを、リアルな立体音響と3Dモデルで試し撃ちできます。</p>
       <div class="start-controls-grid">
-        <div><strong>左クリック</strong><span>射撃（長押しで連射）</span></div>
-        <div><strong>右クリック</strong><span>サイトを覗く（ADS）</span></div>
-        <div><strong>R / B / S</strong><span>リロード / 連射切替 / サプレッサー</span></div>
-        <div><strong>I キー</strong><span>銃の360°鑑賞モード</span></div>
+        <div><strong>射撃</strong><span>左クリック / 画面FIREボタン（長押し連射）</span></div>
+        <div><strong>照準移動</strong><span>マウス / 画面ドラッグ（1本指）</span></div>
+        <div><strong>サイト (ADS)</strong><span>右クリック / サイトボタン</span></div>
+        <div><strong>360°鑑賞</strong><span>Iキー / 鑑賞ボタン（2本指ピンチ拡大）</span></div>
       </div>
       <button id="btn-start" class="start-btn">射撃場に入る（サウンド ON）</button>
     </div>
