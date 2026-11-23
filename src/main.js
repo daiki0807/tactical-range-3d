@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { WEAPON_SPECS } from './weapons/weaponSpecs.js';
 import { createMaterialLibrary } from './weapons/MaterialLibrary.js';
 import { buildWeaponModel } from './weapons/WeaponBuilder.js';
@@ -119,8 +120,64 @@ class TacticalRangeApp {
 
     this._initUI();
     this.selectWeapon('rifle'); // Start with HK416-A8 Carbine
+    this._loadBlenderPistolGLB();
     this._bindEvents();
     this._animate();
+  }
+
+  _loadBlenderPistolGLB() {
+    const loader = new GLTFLoader();
+    const url = `${import.meta.env.BASE_URL}models/pistol_m17x.glb`;
+    loader.load(
+      url,
+      (gltf) => {
+        const root = gltf.scene;
+        root.traverse((obj) => {
+          if (obj.isMesh) {
+            obj.castShadow = true;
+            obj.receiveShadow = true;
+          }
+        });
+
+        const slide = root.getObjectByName('Slide') || null;
+        const trigger = root.getObjectByName('Trigger') || null;
+        const magazine = root.getObjectByName('Magazine') || null;
+        const suppressor = root.getObjectByName('Suppressor') || null;
+        if (suppressor) suppressor.visible = this.suppressed;
+
+        const muzzlePoint = new THREE.Object3D();
+        muzzlePoint.position.set(0, 0.037, -0.192);
+        root.add(muzzlePoint);
+
+        const ejectionPoint = new THREE.Object3D();
+        ejectionPoint.position.set(0.022, 0.046, -0.044);
+        root.add(ejectionPoint);
+
+        this.weaponModels.pistol = {
+          root,
+          parts: {
+            slide,
+            slideRestZ: slide ? slide.position.z : 0,
+            slideTravel: 0.052,
+            trigger,
+            magazine,
+            suppressor,
+            muzzlePoint,
+            ejectionPoint,
+            suppressedMuzzleOffset: -0.18,
+          },
+        };
+
+        // If user already selected the pistol, hot-swap immediately!
+        if (this.currentSpec?.id === 'pistol') {
+          this.selectWeapon('pistol');
+        }
+      },
+      undefined,
+      (err) => {
+        console.warn('Blender GLB pistol fallback active:', err);
+      }
+    );
   }
 
   _setupLights() {
