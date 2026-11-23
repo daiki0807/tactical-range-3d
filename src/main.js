@@ -120,64 +120,116 @@ class TacticalRangeApp {
 
     this._initUI();
     this.selectWeapon('rifle'); // Start with HK416-A8 Carbine
-    this._loadBlenderPistolGLB();
+    this._loadAllBlenderGLBs();
     this._bindEvents();
     this._animate();
   }
 
-  _loadBlenderPistolGLB() {
+  _loadAllBlenderGLBs() {
     const loader = new GLTFLoader();
-    const url = `${import.meta.env.BASE_URL}models/pistol_m17x.glb`;
-    loader.load(
-      url,
-      (gltf) => {
-        const root = gltf.scene;
-        root.traverse((obj) => {
-          if (obj.isMesh) {
-            obj.castShadow = true;
-            obj.receiveShadow = true;
-          }
-        });
-
-        const slide = root.getObjectByName('Slide') || null;
-        const trigger = root.getObjectByName('Trigger') || null;
-        const magazine = root.getObjectByName('Magazine') || null;
-        const suppressor = root.getObjectByName('Suppressor') || null;
-        if (suppressor) suppressor.visible = this.suppressed;
-
-        const muzzlePoint = new THREE.Object3D();
-        muzzlePoint.position.set(0, 0.037, -0.192);
-        root.add(muzzlePoint);
-
-        const ejectionPoint = new THREE.Object3D();
-        ejectionPoint.position.set(0.022, 0.046, -0.044);
-        root.add(ejectionPoint);
-
-        this.weaponModels.pistol = {
-          root,
-          parts: {
-            slide,
-            slideRestZ: slide ? slide.position.z : 0,
-            slideTravel: 0.052,
-            trigger,
-            magazine,
-            suppressor,
-            muzzlePoint,
-            ejectionPoint,
-            suppressedMuzzleOffset: -0.18,
-          },
-        };
-
-        // If user already selected the pistol, hot-swap immediately!
-        if (this.currentSpec?.id === 'pistol') {
-          this.selectWeapon('pistol');
-        }
+    const glbConfigs = [
+      {
+        id: 'pistol',
+        file: 'models/pistol_m17x.glb',
+        muzzle: [0, 0.037, -0.192],
+        eject: [0.022, 0.046, -0.044],
+        slideTravel: 0.052,
+        supOffset: -0.18,
       },
-      undefined,
-      (err) => {
-        console.warn('Blender GLB pistol fallback active:', err);
-      }
-    );
+      {
+        id: 'smg',
+        file: 'models/smg_mp7v.glb',
+        muzzle: [0, 0.034, -0.370],
+        eject: [0.028, 0.044, -0.025],
+        boltTravel: 0.045,
+        supOffset: -0.20,
+      },
+      {
+        id: 'rifle',
+        file: 'models/rifle_hk416.glb',
+        muzzle: [0, 0.034, -0.624],
+        eject: [0.030, 0.038, -0.025],
+        boltTravel: 0.058,
+        supOffset: -0.21,
+      },
+      {
+        id: 'lmg',
+        file: 'models/lmg_mk48.glb',
+        muzzle: [0, 0.044, -0.774],
+        eject: [0.044, 0.024, -0.075],
+        boltTravel: 0.065,
+        supOffset: -0.23,
+      },
+      {
+        id: 'sniper',
+        file: 'models/sniper_mrad.glb',
+        muzzle: [0, 0.034, -1.064],
+        eject: [0.032, 0.038, -0.015],
+        supOffset: -0.26,
+      },
+    ];
+
+    glbConfigs.forEach((cfg) => {
+      const url = `${import.meta.env.BASE_URL}${cfg.file}`;
+      loader.load(
+        url,
+        (gltf) => {
+          const root = gltf.scene;
+          root.traverse((obj) => {
+            if (obj.isMesh) {
+              obj.castShadow = true;
+              obj.receiveShadow = true;
+            }
+          });
+
+          const slide = root.getObjectByName('Slide') || null;
+          const bolt = root.getObjectByName('Bolt') || null;
+          const boltHandle = root.getObjectByName('BoltHandle') || null;
+          const ammoBelt = root.getObjectByName('AmmoBelt') || null;
+          const trigger = root.getObjectByName('Trigger') || null;
+          const magazine = root.getObjectByName('Magazine') || null;
+          const suppressor = root.getObjectByName('Suppressor') || null;
+          if (suppressor) suppressor.visible = this.suppressed;
+
+          const muzzlePoint = new THREE.Object3D();
+          muzzlePoint.position.set(...cfg.muzzle);
+          root.add(muzzlePoint);
+
+          const ejectionPoint = new THREE.Object3D();
+          ejectionPoint.position.set(...cfg.eject);
+          root.add(ejectionPoint);
+
+          this.weaponModels[cfg.id] = {
+            root,
+            parts: {
+              slide,
+              slideRestZ: slide ? slide.position.z : 0,
+              slideTravel: cfg.slideTravel || 0,
+              bolt,
+              boltHandle,
+              boltRestZ: bolt ? bolt.position.z : boltHandle ? boltHandle.position.z : 0,
+              boltTravel: cfg.boltTravel || 0,
+              ammoBelt,
+              trigger,
+              magazine,
+              suppressor,
+              muzzlePoint,
+              ejectionPoint,
+              suppressedMuzzleOffset: cfg.supOffset,
+            },
+          };
+
+          // Hot-swap immediately if user is currently holding this weapon
+          if (this.currentSpec?.id === cfg.id) {
+            this.selectWeapon(cfg.id);
+          }
+        },
+        undefined,
+        (err) => {
+          console.warn(`Blender GLB fallback active for ${cfg.id}:`, err);
+        }
+      );
+    });
   }
 
   _setupLights() {
